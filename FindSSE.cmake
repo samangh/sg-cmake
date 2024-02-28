@@ -46,57 +46,13 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
      string(REGEX REPLACE "^.*(avx2).*$" "\\1" _SSE_THERE ${CPUINFO})
      string(COMPARE EQUAL "avx2" "${_SSE_THERE}" _AVX2_TRUE)
      CHECK_CXX_ACCEPTS_FLAG("-mavx2" _AVX2_OK)
-   endif()
-elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-   if(CPU MATCHES "amd64" OR CPU MATCHES "i.86")
-     exec_program(cat ARGS "/var/run/dmesg.boot | grep Features" OUTPUT_VARIABLE CPUINFO)
 
-     string(REGEX REPLACE "^.*(SSE).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "SSE" "${_SSE_THERE}" _SSE_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse" _SSE_OK)
+     string(REGEX REPLACE "^.*(pclmulqdq).*$" "\\1" _SSE_THERE ${CPUINFO})
+     string(COMPARE EQUAL "pclmulqdq" "${_SSE_THERE}" _CLMUL_TRUE)
+     CHECK_CXX_ACCEPTS_FLAG("-mpclmul" _CLMUL_OK)
 
-     string(REGEX REPLACE "^.*(SSE2).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "SSE2" "${_SSE_THERE}" _SSE2_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse2" _SSE2_OK)
-
-     string(REGEX REPLACE "^.*(SSE3).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "SSE3" "${_SSE_THERE}" _SSE3_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse3" _SSE3_OK)
-
-     string(REGEX REPLACE "^.*(SSSE3).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "SSSE3" "${_SSE_THERE}" _SSSE3_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-mssse3" _SSSE3_OK)
-
-     string(REGEX REPLACE "^.*(SSE4.1).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "SSE4.1" "${_SSE_THERE}" _SSE41_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse4.1" _SSE41_OK)
-     string(REGEX REPLACE "^.*(SSE4.2).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "SSE4.2" "${_SSE_THERE}" _SSE42_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse4.2" _SSE42_OK)
-
-     string(REGEX REPLACE "^.*(AVX).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "AVX" "${_SSE_THERE}" _AVX_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-mavx" _AVX_OK)
-
-     string(REGEX REPLACE "^.*(AVX2).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "AVX2" "${_SSE_THERE}" _AVX2_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-mavx2" _AVX2_OK)
-   endif()
-elseif(CMAKE_SYSTEM_NAME MATCHES "Android")
-  if(CPU MATCHES "x86_64" OR CPU MATCHES "i.86")
-    set(_SSE_TRUE TRUE)
-    set(_SSE2_TRUE TRUE)
-    set(_SSE3_TRUE TRUE)
-    set(_SSSE3_TRUE TRUE)
-
-    CHECK_CXX_ACCEPTS_FLAG("-msse" _SSE_OK)
-    CHECK_CXX_ACCEPTS_FLAG("-msse2" _SSE2_OK)
-    CHECK_CXX_ACCEPTS_FLAG("-msse3" _SSE3_OK)
-    CHECK_CXX_ACCEPTS_FLAG("-mssse3" _SSSE3_OK)
-    CHECK_CXX_ACCEPTS_FLAG("-msse4.1" _SSE41_OK)
-    CHECK_CXX_ACCEPTS_FLAG("-msse4.2" _SSE42_OK)
-    CHECK_CXX_ACCEPTS_FLAG("-mavx" _AVX_OK)
-    CHECK_CXX_ACCEPTS_FLAG("-mavx2" _AVX2_OK)
+     set(_CRC32_TRUE TRUE)
+     CHECK_CXX_ACCEPTS_FLAG("-mcrc32" _CRC32_OK)
    endif()
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
    if(NOT CPU MATCHES "arm")
@@ -133,10 +89,17 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
       string(REGEX REPLACE "^.*(AVX2).*$" "\\1" _SSE_THERE ${CPUINFO})
       string(COMPARE EQUAL "AVX2" "${_SSE_THERE}" _AVX2_TRUE)
       CHECK_CXX_ACCEPTS_FLAG("-mavx2" _AVX2_OK)
+
+      string(REGEX REPLACE "^.*(pclmulqdq).*$" "\\1" _SSE_THERE ${CPUINFO})
+      string(COMPARE EQUAL "pclmulqdq" "${_SSE_THERE}" _CLMUL_TRUE)
+      CHECK_CXX_ACCEPTS_FLAG("-mpclmul" _CLMUL_OK)
+
+      set(_CRC32_TRUE TRUE)
+      CHECK_CXX_ACCEPTS_FLAG("-mcrc32" _CRC32_OK)
    endif()
  elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
    # Don't know how to check in Windows
-   foreach(c SSE SSE2 SSE3 SSE41 SSE42 AVX AVX2)
+   foreach(c SSE SSE2 SSE3 SSE41 SSE42 AVX AVX2 CLMUL CRC32)
       set(_${c}_TRUE true)
       set(_${c}_OK   true)
    endforeach()
@@ -152,20 +115,46 @@ foreach(comp ${SSE_FIND_COMPONENTS})
 endforeach()
 
 ## Find package
+##############
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(SSE
   REQUIRED_VARS _SSE_TRUE _SSE_OK
   HANDLE_COMPONENTS)
 
-if(SSE_SSE41_FOUND)
-  add_library(SSE41 INTERFACE)
-  target_compile_options(SSE41
-    INTERFACE
-      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-mcrc32 -msse4.1 -mpclmul>)
-  target_compile_definitions(SSE41 INTERFACE WITH_SSE41)
+## Set alias libraries
+##############
 
-  add_library(SSE::SSE41 ALIAS SSE41)
+if(SSE_SSE41_FOUND)
+  add_library(SSE_SSE41 INTERFACE)
+  target_compile_options(SSE_SSE41
+    INTERFACE
+      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-msse4.1>)
+  target_compile_definitions(SSE_SSE41 INTERFACE CPU_SUPPORTS_SSE41)
+
+  add_library(SSE::SSE41 ALIAS SSE_SSE41)
 endif()
+
+if(SSE_CRC32_FOUND)
+  add_library(SSE_CRC32 INTERFACE)
+  target_compile_options(SSE_CRC32
+    INTERFACE
+      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-mcrc32 >)
+  target_compile_definitions(SSE_CRC32 INTERFACE CPU_SUPPORTS_CRC32)
+
+  add_library(SSE::CRC32 ALIAS SSE_CRC32)
+endif()
+
+if(SSE_CLMUL_FOUND)
+  add_library(SSE_CLMUL INTERFACE)
+  target_compile_options(SSE_CLMUL
+    INTERFACE
+      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-mpclmul >)
+  target_compile_definitions(SSE_CLMUL INTERFACE CPU_SUPPORTS_CLMUL)
+
+  add_library(SSE::CLMUL ALIAS SSE_CLMUL)
+endif()
+
+##############
 
 mark_as_advanced(SSE_FOUND)
 
@@ -194,4 +183,7 @@ unset(_AVX_OK CACHE)
 unset(_AVX2_TRUE)
 unset(_AVX2_OK)
 unset(_AVX2_OK CACHE)
-
+unset(_CRC32_TRUE)
+unset(_CRC32_TRUE CACHE)
+unset(_CRC32_OK)
+unset(_CRC32_OK CACHE)
