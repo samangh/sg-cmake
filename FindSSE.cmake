@@ -10,7 +10,8 @@ include(TestCXXAcceptsFlag)
 include(FindPackageHandleStandardArgs)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-   if(CPU MATCHES "x86_64" OR CPU MATCHES "i.86")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64"
+      OR CMAKE_SYSTEM_PROCESSOR MATCHES "i.86")
      exec_program(cat ARGS "/proc/cpuinfo" OUTPUT_VARIABLE CPUINFO)
 
      string(REGEX REPLACE "^.*(sse).*$" "\\1" _SSE_THERE ${CPUINFO})
@@ -55,7 +56,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
      CHECK_CXX_ACCEPTS_FLAG("-mcrc32" _CRC32_OK)
    endif()
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-   if(NOT CPU MATCHES "arm")
+   if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
       exec_program("/usr/sbin/sysctl -n machdep.cpu.features machdep.cpu.leaf7_features" OUTPUT_VARIABLE CPUINFO)
 
       string(REGEX REPLACE "^.*[^S](SSE).*$" "\\1" _SSE_THERE ${CPUINFO})
