@@ -1,190 +1,133 @@
-# Taken from https://raw.githubusercontent.com/xbmc/xbmc/master/cmake/modules/FindSSE.cmake,
-# who took it from https://github.com/hideo55/CMake-FindSSE/blob/master/FindSSE.cmake
-# Modifed by me to add components
+# Checks for the following CPU flags (and support by compiler)
+#
+# Components: SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 AVX512
 
-# Cmmponents: SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2
+include(CheckCXXCompilerFlag)
 
-# Check if SSE instructions are available on the machine where
-# the project is compiled.
-include(TestCXXAcceptsFlag)
-include(FindPackageHandleStandardArgs)
+##
+## _SSE_set_target
+##
 
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64"
-      OR CMAKE_SYSTEM_PROCESSOR MATCHES "i.86")
-     exec_program(cat ARGS "/proc/cpuinfo" OUTPUT_VARIABLE CPUINFO)
+function(_SSE_set_target)
+  set(options "")
+  set(multiValueArgs "")
+  set(oneValueArgs FEATURE GCC_FLAG CLANG_FLAG MSVC_FLAG)
+  cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-     string(REGEX REPLACE "^.*(sse).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "sse" "${_SSE_THERE}" _SSE_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse" _SSE_OK)
+  if(SSE_${ARG_FEATURE}_FOUND AND
+      NOT TARGET SSE_${ARG_FEATURE} AND
+      NOT TARGET SSE::${ARG_FEATURE})
 
-     string(REGEX REPLACE "^.*(sse2).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "sse2" "${_SSE_THERE}" _SSE2_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse2" _SSE2_OK)
+    add_library(SSE_${ARG_FEATURE} INTERFACE)
+    target_compile_options(SSE_${ARG_FEATURE} INTERFACE
+      $<$<CXX_COMPILER_ID:GNU>:${ARG_GCC_FLAG}>
+      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:${ARG_CLANG_FLAG}>
+      $<$<CXX_COMPILER_ID:MSVC>:${ARG_MSVC_FLAG}>)
+    target_compile_definitions(SSE_${ARG_FEATURE} INTERFACE CPU_SUPPORTS_${ARG_FEATURE})
 
-     # SSE3 is also known as the Prescott New Instructions (PNI)
-     # it's labeled as pni in /proc/cpuinfo
-     string(REGEX REPLACE "^.*(pni).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "pni" "${_SSE_THERE}" _SSE3_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse3" _SSE3_OK)
+    add_library(SSE::${ARG_FEATURE} ALIAS SSE_${ARG_FEATURE})
+  endif()
+endfunction()
 
-     string(REGEX REPLACE "^.*(ssse3).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "ssse3" "${_SSE_THERE}" _SSSE3_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-mssse3" _SSSE3_OK)
+##
+## Start
+##
 
-     string(REGEX REPLACE "^.*(sse4_1).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "sse4_1" "${_SSE_THERE}" _SSE41_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse4.1" _SSE41_OK)
+if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR
+    CMAKE_SYSTEM_NAME MATCHES "FreeBSD" OR
+    (CMAKE_SYSTEM_NAME MATCHES "Darwin" AND
+      NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm"))
+  check_cpu_flag(CPU_FLAG sse COMPILER_FLAG -msse OUTPUT_VARIABLE _SSE_SUPPORTED)
+  check_cpu_flag(CPU_FLAG sse2 COMPILER_FLAG -msse2 OUTPUT_VARIABLE _SSE2_SUPPORTED)
+  check_cpu_flag(CPU_FLAG pni COMPILER_FLAG -msse3 OUTPUT_VARIABLE _SSE3_SUPPORTED)
+  check_cpu_flag(CPU_FLAG sse4.1 COMPILER_FLAG -msse4.1 OUTPUT_VARIABLE _SSE41_SUPPORTED)
+  check_cpu_flag(CPU_FLAG sse4.2 COMPILER_FLAG -msse4.2 OUTPUT_VARIABLE _SSE42_SUPPORTED)
+  check_cpu_flag(CPU_FLAG ssse3 COMPILER_FLAG -msse3 OUTPUT_VARIABLE _SSSE3_SUPPORTED)
+  check_cpu_flag(CPU_FLAG avx COMPILER_FLAG -mavx OUTPUT_VARIABLE _AVX_SUPPORTED)
+  check_cpu_flag(CPU_FLAG avx2 COMPILER_FLAG -msse4.2 OUTPUT_VARIABLE _AVX2_SUPPORTED)
+  check_cpu_flag(CPU_FLAG pclmulqdq COMPILER_FLAG -mpclmul OUTPUT_VARIABLE _CLMUL_SUPPORTED)
+  check_cxx_compiler_flag("-mcrc32" _CRC32_SUPPORTED)
 
-     string(REGEX REPLACE "^.*(sse4_2).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "sse4_2" "${_SSE_THERE}" _SSE42_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-msse4.2" _SSE42_OK)
-
-     string(REGEX REPLACE "^.*(avx).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "avx" "${_SSE_THERE}" _AVX_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-mavx" _AVX_OK)
-
-     string(REGEX REPLACE "^.*(avx2).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "avx2" "${_SSE_THERE}" _AVX2_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-mavx2" _AVX2_OK)
-
-     string(REGEX REPLACE "^.*(pclmulqdq).*$" "\\1" _SSE_THERE ${CPUINFO})
-     string(COMPARE EQUAL "pclmulqdq" "${_SSE_THERE}" _CLMUL_TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-mpclmul" _CLMUL_OK)
-
-     set(_CRC32_TRUE TRUE)
-     CHECK_CXX_ACCEPTS_FLAG("-mcrc32" _CRC32_OK)
-   endif()
-elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-   if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-      exec_program("/usr/sbin/sysctl -n machdep.cpu.features machdep.cpu.leaf7_features" OUTPUT_VARIABLE CPUINFO)
-
-      string(REGEX REPLACE "^.*[^S](SSE).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "SSE" "${_SSE_THERE}" _SSE_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-msse" _SSE_OK)
-
-      string(REGEX REPLACE "^.*[^S](SSE2).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "SSE2" "${_SSE_THERE}" _SSE2_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-msse2" _SSE2_OK)
-
-      string(REGEX REPLACE "^.*[^S](SSE3).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "SSE3" "${_SSE_THERE}" _SSE3_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-msse3" _SSE3_OK)
-
-      string(REGEX REPLACE "^.*(SSSE3).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "SSSE3" "${_SSE_THERE}" _SSSE3_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-mssse3" _SSSE3_OK)
-
-      string(REGEX REPLACE "^.*(SSE4.1).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "SSE4.1" "${_SSE_THERE}" _SSE41_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-msse4.1" _SSE41_OK)
-
-      string(REGEX REPLACE "^.*(SSE4.2).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "SSE4.2" "${_SSE_THERE}" _SSE42_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-msse4.2" _SSE42_OK)
-
-      string(REGEX REPLACE "^.*(AVX).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "AVX" "${_SSE_THERE}" _AVX_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-mavx" _AVX_OK)
-
-      string(REGEX REPLACE "^.*(AVX2).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "AVX2" "${_SSE_THERE}" _AVX2_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-mavx2" _AVX2_OK)
-
-      string(REGEX REPLACE "^.*(pclmulqdq).*$" "\\1" _SSE_THERE ${CPUINFO})
-      string(COMPARE EQUAL "pclmulqdq" "${_SSE_THERE}" _CLMUL_TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-mpclmul" _CLMUL_OK)
-
-      set(_CRC32_TRUE TRUE)
-      CHECK_CXX_ACCEPTS_FLAG("-mcrc32" _CRC32_OK)
-   endif()
- elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
-   # Don't know how to check in Windows
-   foreach(c SSE SSE2 SSE3 SSE41 SSE42 AVX AVX2 CLMUL CRC32)
-      set(_${c}_TRUE true)
-      set(_${c}_OK   true)
-   endforeach()
+  # SSE3 is known as the Prescott New Instructions (PNI) on Linux
+  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    check_cpu_flag(CPU_FLAG pni COMPILER_FLAG -msse3 OUTPUT_VARIABLE _SSE3_SUPPORTED)
+  else()
+    check_cpu_flag(CPU_FLAG sse3 COMPILER_FLAG -msse3 OUTPUT_VARIABLE _SSE3_SUPPORTED)
+  endif()
 endif()
 
-# Added by Saman
-# set components
-# A components, say SSE41, is found if both _SSE41_TRUE and _SSE41_OK are set
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+  # Don't know how to check in Windows
+  check_cxx_compiler_flag("/arch:AVX" _AVX_SUPPORTED)
+  check_cxx_compiler_flag("/arch:AVX2" _AVX2_SUPPORTED)
+  check_cxx_compiler_flag("/arch:AVX512" _AVX512_SUPPORTED)
+  check_cxx_compiler_flag("/d2archSSE42" _SSE42_SUPPORTED)
+
+  # Set everything else true
+  foreach(c SSE SSE2 SSE3 SSE41 SSSE3 CLMUL CRC32)
+    set(_${c}_SUPPORTED true)
+  endforeach()
+endif()
+
+##
+## Find components
+##
+
+# A component, say SSE41, is found if _SSE41_SUPPORTED is set
 foreach(comp ${SSE_FIND_COMPONENTS})
-  if(_${comp}_TRUE AND _${comp}_OK)
-    set(SSE_${comp}_FOUND TRUE)
-  endif()
+  set(SSE_${comp}_FOUND _${comp}_SUPPORTED)
 endforeach()
 
+##
 ## Find package
-##############
+##
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(SSE
-  REQUIRED_VARS _SSE_TRUE _SSE_OK
-  HANDLE_COMPONENTS)
+find_package_handle_standard_args(SSE HANDLE_COMPONENTS)
 
+##
 ## Set alias libraries
-##############
+##
 
-if(SSE_SSE41_FOUND)
-  add_library(SSE_SSE41 INTERFACE)
-  target_compile_options(SSE_SSE41
-    INTERFACE
-      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-msse4.1>)
-  target_compile_definitions(SSE_SSE41 INTERFACE CPU_SUPPORTS_SSE41)
+_sse_set_target(FEATURE SSE
+  GCC_FLAG "-msse"
+  CLANG_FLAG "-msse")
 
-  add_library(SSE::SSE41 ALIAS SSE_SSE41)
-endif()
+_sse_set_target(FEATURE SSE2
+  GCC_FLAG "-msse2"
+  CLANG_FLAG "-msse2")
 
-if(SSE_CRC32_FOUND)
-  add_library(SSE_CRC32 INTERFACE)
-  target_compile_options(SSE_CRC32
-    INTERFACE
-      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-mcrc32 >)
-  target_compile_definitions(SSE_CRC32 INTERFACE CPU_SUPPORTS_CRC32)
+_sse_set_target(FEATURE SSE3
+  GCC_FLAG "-msse3"
+  CLANG_FLAG "-msse3")
 
-  add_library(SSE::CRC32 ALIAS SSE_CRC32)
-endif()
+_sse_set_target(FEATURE SSE3
+  GCC_FLAG "-msse4.1"
+  CLANG_FLAG "-msse4.1")
 
-if(SSE_CLMUL_FOUND)
-  add_library(SSE_CLMUL INTERFACE)
-  target_compile_options(SSE_CLMUL
-    INTERFACE
-      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-mpclmul >)
-  target_compile_definitions(SSE_CLMUL INTERFACE CPU_SUPPORTS_CLMUL)
+_sse_set_target(FEATURE SSE42
+  GCC_FLAG "-msse4.2"
+  CLANG_FLAG "-msse4.2"
+  MSVC_FLAG "/d2archSSE42")
 
-  add_library(SSE::CLMUL ALIAS SSE_CLMUL)
-endif()
+_sse_set_target(FEATURE AVX
+  GCC_FLAG "-mavx"
+  CLANG_FLAG "-mavx"
+  MSVC_FLAG "/arch:AVX")
 
-##############
+_sse_set_target(FEATURE AVX2
+  GCC_FLAG "-mavx2"
+  CLANG_FLAG "-mavx2"
+  MSVC_FLAG "/arch:AVX2")
+
+_sse_set_target(FEATURE AVX2
+  MSVC_FLAG "/arch:AVX512")
+
+_SSE_set_target(FEATURE CRC32
+  GCC_FLAG "-mcrc32"
+  CLANG_FLAG "-mcrc32")
+
+_SSE_set_target(FEATURE CLMUL
+  GCC_FLAG "-mpclmul"
+  CLANG_FLAG "-mpclmul")
 
 mark_as_advanced(SSE_FOUND)
-
-unset(_SSE_THERE)
-unset(_SSE_TRUE)
-unset(_SSE_OK)
-unset(_SSE_OK CACHE)
-unset(_SSE2_TRUE)
-unset(_SSE2_OK)
-unset(_SSE2_OK CACHE)
-unset(_SSE3_TRUE)
-unset(_SSE3_OK)
-unset(_SSE3_OK CACHE)
-unset(_SSSE3_TRUE)
-unset(_SSSE3_OK)
-unset(_SSSE3_OK CACHE)
-unset(_SSE4_1_TRUE)
-unset(_SSE41_OK)
-unset(_SSE41_OK CACHE)
-unset(_SSE4_2_TRUE)
-unset(_SSE42_OK)
-unset(_SSE42_OK CACHE)
-unset(_AVX_TRUE)
-unset(_AVX_OK)
-unset(_AVX_OK CACHE)
-unset(_AVX2_TRUE)
-unset(_AVX2_OK)
-unset(_AVX2_OK CACHE)
-unset(_CRC32_TRUE)
-unset(_CRC32_TRUE CACHE)
-unset(_CRC32_OK)
-unset(_CRC32_OK CACHE)
