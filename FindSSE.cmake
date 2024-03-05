@@ -3,6 +3,7 @@
 # Components: SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 AVX512
 
 include(CheckCXXCompilerFlag)
+include(check_cpu_flag)
 
 ##
 ## _SSE_set_target
@@ -44,7 +45,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR
   check_cpu_flag(CPU_FLAG sse4.2 COMPILER_FLAG -msse4.2 OUTPUT_VARIABLE _SSE42_SUPPORTED)
   check_cpu_flag(CPU_FLAG ssse3 COMPILER_FLAG -msse3 OUTPUT_VARIABLE _SSSE3_SUPPORTED)
   check_cpu_flag(CPU_FLAG avx COMPILER_FLAG -mavx OUTPUT_VARIABLE _AVX_SUPPORTED)
-  check_cpu_flag(CPU_FLAG avx2 COMPILER_FLAG -msse4.2 OUTPUT_VARIABLE _AVX2_SUPPORTED)
+  check_cpu_flag(CPU_FLAG avx2 COMPILER_FLAG -mavx2 OUTPUT_VARIABLE _AVX2_SUPPORTED)
   check_cpu_flag(CPU_FLAG pclmulqdq COMPILER_FLAG -mpclmul OUTPUT_VARIABLE _CLMUL_SUPPORTED)
   check_cxx_compiler_flag("-mcrc32" _CRC32_SUPPORTED)
 
@@ -119,7 +120,7 @@ _sse_set_target(FEATURE AVX2
   CLANG_FLAG "-mavx2"
   MSVC_FLAG "/arch:AVX2")
 
-_sse_set_target(FEATURE AVX2
+_sse_set_target(FEATURE AVX512
   MSVC_FLAG "/arch:AVX512")
 
 _SSE_set_target(FEATURE CRC32
