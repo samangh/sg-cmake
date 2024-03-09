@@ -18,13 +18,14 @@ function(check_cpu_flag)
       CMAKE_SYSTEM_NAME MATCHES "Darwin")
 
     if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-      exec_program(cat ARGS "/proc/cpuinfo" OUTPUT_VARIABLE CPUINFO)
+      execute_process(COMMAND cat "/proc/cpuinfo" OUTPUT_VARIABLE CPUINFO)
     endif()
-    if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-      exec_program("/usr/sbin/sysctl -n machdep.cpu.features machdep.cpu.leaf7_features" OUTPUT_VARIABLE CPUINFO)
+    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+      execute_process(COMMAND /usr/sbin/sysctl "-n" "machdep.cpu.features" "machdep.cpu.leaf7_features" OUTPUT_VARIABLE CPUINFO)
     endif()
     if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-      exec_program(cat ARGS "/var/run/dmesg.boot | grep Features" OUTPUT_VARIABLE CPUINFO)
+      execute_process(COMMAND cat "/var/run/dmesg.boot" COMMAND grep "Features"
+        OUTPUT_VARIABLE CPUINFO)
     endif()
 
     string(REGEX REPLACE "^.*(${ARG_CPU_FLAG}).*$" "\\1" _SSE_THERE ${CPUINFO})
